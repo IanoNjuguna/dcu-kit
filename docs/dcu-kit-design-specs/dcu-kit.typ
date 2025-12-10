@@ -55,7 +55,6 @@
     #align(right)[
       #image("./images/tx-logo-dark.png", width: 25%, fit: "contain")
     ]
-    #v(-0.5cm)
     #line(length: 100%, stroke: 0.5pt)
   ],
 )
@@ -106,7 +105,7 @@
 = Overview
 \
 
-The DCU-Toolkit (Decentralized Credit Unions Toolkit) is a comprehensive smart contract infrastructure developed using Aiken for the Cardano blockchain. It is designed to facilitate automated cooperative finance operations including group savings, rotating fund distribution, democratic governance, and treasury management for traditional savings groups such as Chamas, SACCOs, Tontines, and similar cooperative finance models.
+The DCU-Toolkit (Decentralized Credit Unions Toolkit) is a smart contract infrastructure developed using Aiken for the Cardano blockchain. It is designed to facilitate automated cooperative finance operations including group savings, rotating fund distribution, democratic governance, and treasury management for traditional savings groups such as Chamas, SACCOs, Tontines, and similar cooperative finance models.
 
 This toolkit empowers members to seamlessly create accounts, form cooperative groups, contribute funds, participate in democratic decision-making, and manage shared treasuries directly from their wallets. It ensures secure and efficient transactions by automating group governance, fund rotation, and treasury operations within a decentralized framework.
 
@@ -117,7 +116,7 @@ This toolkit empowers members to seamlessly create accounts, form cooperative gr
 \
 #figure(
   image("./images/dcu-kit-architecture.png", width: 100%),
-  caption: [DCU-Toolkit Architecture],
+  caption: [DCU Toolkit Architecture],
 )
 \
 
@@ -129,7 +128,7 @@ There are three validators in this cooperative finance system.
 
 + *Group Validator*
   
-  A multi-validator responsible for creating cooperative groups by minting CIP-68 compliant Group NFT Assets. It manages group configuration including contribution fees, joining fees, penalties, subscription intervals, and democratic governance rules. The validator enables group administrators to update group metadata and deactivate groups when necessary.
+  A multi-validator responsible for creating cooperative groups by minting CIP-68 compliant Group NFT Assets. It manages group configuration including contribution fees, joining fees, penalties, subscription intervals, and democratic governance rules. The validator enables group administrators to update group metadata and deactivate groups when necessary given a signature threshold.
 
 + *Treasury Validator*
   
@@ -158,19 +157,19 @@ There are three validators in this cooperative finance system.
 
   Can only be minted by a user when creating an account in the cooperative finance system and burned when the user deletes their account. A check must be included to verify that there are no active memberships in any Treasury before burning.
 
-  - *TokenName:* Defined in Account Validator using CIP-68 standards with transaction ID, output index, and appropriate prefix (prefix_100 for reference NFT, prefix_222 for user NFT).
+  - *TokenName:* Defined in Account Validator using CIP-68 standards with transaction ID, output index, and appropriate prefix (`prefix_100` for reference NFT, `prefix_222` for user NFT).
 
 + *Group NFT*
 
   Can only be minted when creating a cooperative group and held by the group administrator. This NFT represents ownership and administrative control over the group configuration and operations.
 
-  - *TokenName:* Defined in Group Validator using CIP-68 standards with transaction ID, output index, and appropriate prefix (prefix_100 for reference NFT, prefix_222 for user NFT).
+  - *TokenName:* Defined in Group Validator using CIP-68 standards with transaction ID, output index, and appropriate prefix (`prefix_100` for reference NFT, `prefix_222` for user NFT).
 
-+ *Treasury NFT* 
++ *Membership NFT* 
 
-  Can only be minted when a member joins a group by depositing funds to the Treasury Validator and burned when a member exits the system or when penalties are processed.
+  Can only be minted when a user joins a group by depositing funds to the Membership Validator making them a member and burned when a member exits the system or when penalties are processed.
 
-  - *TokenName:* Defined in Treasury Validator parameters with a static identifier (e.g., "treasury-membership").
+  - *TokenName:* Defined in Membership Validator parameters with a static identifier (e.g., "membership").
 
 #pagebreak()
 
@@ -199,18 +198,18 @@ The Treasury Validator is the core contract responsible for managing member cont
     member_input_index: Int,
     treasury_output_index: Int,
   }
-`````````````*
+  ```*
 
 - *```rs 
   TerminateGroup
-````````````*
+  ```*
 
 \
 ===== Validation
 \
 + *JoinGroup* 
   
-  The redeemer allows a member to join a cooperative group by minting one unique Treasury Token representing their membership.
+  The redeemer allows a member to join a cooperative group by minting one unique Membership Token representing their membership.
 
   - Validate that the member's Account NFT is present in the transaction inputs.
   
@@ -218,17 +217,17 @@ The Treasury Validator is the core contract responsible for managing member cont
   
   - The treasury output must be sent to the Treasury Script's address and contain a Treasury datum that is consistent with the Group datum.
   
-  - Exactly one Treasury Token (with token name "treasury-membership") is minted.
+  - Exactly one Membership Token (with token name "treasury-membership") is minted.
   
   - Validate that sufficient contribution fees and joining fees are locked in the Treasury UTxO according to the Group datum specifications.
   
   - Ensure that the User NFT doesn't go to the Script
-  - Ensure Treasury token goes back to the script
+  - Ensure Membership token goes back to the script
   \
 
 + *TerminateGroup*
   
-  - The redeemer must burn exactly one Treasury Token (i.e. a single token with the token name "treasury-membership" is burned).
+  - The redeemer must burn exactly one Membership Token (i.e. a single token with the token name "treasury-membership" is burned).
   
   - Validate that the Group reference input provides valid Group datum.
 
@@ -249,16 +248,14 @@ This is a Sum type datum where one represents the treasury datum and the other r
 
 - *`membership_start`: ```rs Int```*  – The timestamp when the member joined the group.
 
-- *`membership_end`: ```rs Int```*  – The current expiry time of the membership.
+- *`contribution_list`:* List of contributions – Each contribution specifies when and how much can be withdrawn based on the rotation schedule.
 
-- *`total_installments`:* List of Installment – Each installment specifies when and how much can be withdrawn based on the rotation schedule.
+  - *`Contribution`*:
+    - *`claimable_at` : ```rs Int```*  – Time after which the loan can be claimed.
+    - *`claimable_amount` : ```rs Int```*  – The loan amount available for withdrawal at that time.
 
-  - *`Installment`*:
-    - *`claimable_at` : ```rs Int```*  – Time after which the installment can be claimed.
-    - *`claimable_amount` : ```rs Int```*  – The amount available for withdrawal at that time.
-
-- *`group_shares`: ```rs Int```* – The number of shares allocated to this member within the group.
-
+// - *`group_shares`: ```rs Int```* – The number of shares allocated to this member within the group.
+\
 ===== Penalty datum <penalty-datum>
 
 \
@@ -276,9 +273,8 @@ This is a Sum type datum where one represents the treasury datum and the other r
     admin_input_index: Int,
     treasury_input_index: Int,
     treasury_output_index: Int,
-    installments_withdrawn: Int,
   }
- ```*
+  ```*
 
 - *```rust
   ExitGroup {
@@ -295,9 +291,9 @@ This is a Sum type datum where one represents the treasury datum and the other r
     member_input_index: Int,
     treasury_input_index: Int,
     treasury_output_index: Int,
-    installments_withdrawn: Int,
+    loans_withdrawn: Int,
   } 
-```*
+  ```*
 
 \
 ==== Validation
@@ -305,7 +301,7 @@ This is a Sum type datum where one represents the treasury datum and the other r
 \
 + *AdminWithdraw* 
   
-  This redeemer allows the group administrator to withdraw accumulated contributions according to the rotation schedule and vesting rules.
+  This redeemer allows the group administrator to withdraw joining fees or funds agreed upon by the group using a multisig signature threshold.
 
   - The Treasury UTxO being spent must be identified and contain a valid Treasury datum.
 
@@ -316,14 +312,14 @@ This is a Sum type datum where one represents the treasury datum and the other r
   - The output UTxO (at treasury_output_index) must remain at the Treasury Script's address and include an updated Treasury datum.
 
   - Implement linear vesting for fund release by:
-    - Dropping the first *`installments_withdrawn`* elements from the original installments list to form the new Treasury datum.
+    - Dropping the first *`fees_withdrawn`* elements from the original fees installments list to form the new Treasury datum.
     
     - Verifying that the difference in value between input and output does not exceed the sum of the *`claimable_amount`* of installments that are past their *`claimable_at`* time.
 
   \
 + *ExitGroup* 
 
-  The redeemer allows a member to exit a cooperative group, unlocking remaining contributions to their wallet address.
+  The redeemer allows a member to exit a cooperative group, unlocking remaining contributions to their wallet address provided they have no loans.
 
   - The member must provide an input (at *`member_input_index`*) containing the appropriate Account NFT.
 
@@ -333,9 +329,9 @@ This is a Sum type datum where one represents the treasury datum and the other r
 
   - The decision branch is based on the membership timing:
 
-    - *Without Penalty:* If the current time is past the membership period or if the Group is inactive, the Treasury Token is burned.
+    // - *Without Penalty:* If the current time is past the membership period or if the Group is inactive, the Membership Token is burned.
 
-    - *With Penalty:* If exiting early (active group), the transaction must produce an output (at penalty_output_index) carrying a Penalty datum. This output must include at least the minimum penalty fee as defined by the Group datum.
+    - *Penalty:* If exiting early (active group), the transaction must produce an output (at penalty_output_index) carrying a Penalty datum. This output must include at least the minimum penalty fee as defined by the Group datum.
 
   \
 + *MemberWithdraw* 
@@ -348,9 +344,9 @@ This is a Sum type datum where one represents the treasury datum and the other r
 
   - The Group datum (from the reference input at group_ref_input_index) must be validated for withdrawal eligibility.
 
-  - Implement linear vesting by verifying withdrawal amount against vesting schedule and member's share allocation.
+  - Implement linear vesting by verifying withdrawal amount against vesting schedule and member's share allocation, contribution and reputation score.
   
-  - If group is inactive, allow full withdrawal and burn the Treasury Token.
+  - If group is inactive, allow full withdrawal and burn the Membership Token.
 
 #pagebreak()
 
@@ -508,7 +504,7 @@ Nothing
 
 - *```rust 
   DeleteAccount { reference_token_name: AssetName }
-```*
+  ```*
 
 \
 ====== Validation
